@@ -147,9 +147,21 @@ func dispatchCopy(b *Builder, args []string, attributes map[string]bool, flagArg
 	if len(args) < 2 {
 		return errAtLeastOneArgument("COPY")
 	}
+
 	last := len(args) - 1
 	dest := makeAbsolute(args[last], b.RunConfig.WorkingDir)
-	b.PendingCopies = append(b.PendingCopies, Copy{Src: args[0:last], Dest: dest, Download: false})
+	c := Copy{Src: args[0:last], Dest: dest, Download: false}
+
+	if len(flagArgs) > 0 {
+		flags := flag.NewFlagSet("", flag.ContinueOnError)
+		fromStage := flags.String("from", "", "")
+		if err := flags.Parse(flagArgs); err != nil {
+			return err
+		}
+		c.FromStage = *fromStage
+	}
+
+	b.PendingCopies = append(b.PendingCopies, c)
 	return nil
 }
 

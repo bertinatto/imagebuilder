@@ -42,10 +42,10 @@ func main() {
 	}
 
 	options.Directory = args[0]
-	if len(tags) > 0 {
-		options.Tag = tags[0]
-		options.AdditionalTags = tags[1:]
-	}
+	//if len(tags) > 0 {
+	//options.Tag = tags[0]
+	//options.AdditionalTags = tags[1:]
+	//}
 	if len(dockerfilePath) == 0 {
 		dockerfilePath = filepath.Join(options.Directory, "Dockerfile")
 	}
@@ -90,41 +90,63 @@ func build(dockerfile string, additionalDockerfiles []string, arguments map[stri
 		return fmt.Errorf("error: Could not parse default .dockerignore: %v", err)
 	}
 
-	client, err := docker.NewClientFromEnv()
-	if err != nil {
-		return fmt.Errorf("error: No connection to Docker available: %v", err)
-	}
-	e.Client = client
-
-	// TODO: handle signals
-	defer func() {
-		for _, err := range e.Release() {
-			fmt.Fprintf(e.ErrOut, "error: Unable to clean up build: %v\n", err)
+	// FIXME: this is an highly customized function for testing purposes.
+	sections := imagebuilder.ParseStages(dockerfile)
+	//var toCommit []*imagebuilder.Builder
+	for _, s := range sections {
+		client, err := docker.NewClientFromEnv()
+		if err != nil {
+			return fmt.Errorf("error: No connection to Docker available: %v", err)
 		}
-	}()
+		e.AddStage(client)
 
-	b, node, err := imagebuilder.NewBuilderForFile(dockerfile, arguments)
-	if err != nil {
-		return err
-	}
-	if err := e.Prepare(b, node, from); err != nil {
-		return err
-	}
-	if err := e.Execute(b, node); err != nil {
-		return err
-	}
+		// TODO: handle signals
+		defer func() {
+			for _, err := range e.Release() {
+				fmt.Fprintf(e.ErrOut, "error: Unable to clean up build: %v\n", err)
+			}
+		}()
 
-	for _, s := range additionalDockerfiles {
-		_, node, err := imagebuilder.NewBuilderForFile(s, arguments)
+		reader := strings.NewReader(s)
+		b, node, err := imagebuilder.NewBuilderForReader(reader, arguments)
 		if err != nil {
 			return err
 		}
+
+		if err := e.Prepare(b, node, from); err != nil {
+			return err
+		}
+
 		if err := e.Execute(b, node); err != nil {
 			return err
 		}
+
+		defer e.Commit(b)
+		//toCommit = append(toCommit, b)
+		//if err := e.Commit(b); err != nil {
+		//return err
+		//}
 	}
 
-	return e.Commit(b)
+	//for _, b := range toCommit {
+	//if err := e.Commit(b); err != nil {
+	//return err
+	//}
+	//}
+
+	return nil
+
+	// FIXME: ignoring additional files.
+	//for _, s := range additionalDockerfiles {
+	//_, node, err := imagebuilder.NewBuilderForFile(s, arguments)
+	//if err != nil {
+	//return err
+	//}
+	//if err := e.Execute(lastStage, node); err != nil {
+	//return err
+	//}
+	//}
+
 }
 
 type stringSliceFlag []string

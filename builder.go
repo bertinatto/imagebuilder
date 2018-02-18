@@ -21,10 +21,11 @@ import (
 type Copy struct {
 	// If true, this is a copy from the file system to the container. If false,
 	// the copy is from the context.
-	FromFS   bool
-	Src      []string
-	Dest     string
-	Download bool
+	FromFS    bool
+	Src       []string
+	Dest      string
+	Download  bool
+	FromStage string
 }
 
 // Run defines a run operation required in the container.
@@ -186,6 +187,20 @@ func NewBuilderForFile(path string, args map[string]string) (*Builder, *parser.N
 	return NewBuilderForReader(f, args)
 }
 
+func ParseStages(path string) []string {
+	f, err := os.Open(path)
+	if err != nil {
+		//return nil, nil, err
+		log.Fatal(err)
+	}
+	//defer f.Close()
+
+	r1, _ := ioutil.ReadAll(io.NewSectionReader(f, 0, 189))
+	r2, _ := ioutil.ReadAll(io.NewSectionReader(f, 189, 300))
+
+	return []string{string(r1), string(r2)}
+}
+
 // Step creates a new step from the current state.
 func (b *Builder) Step() *Step {
 	dst := make([]string, len(b.Env)+len(b.RunConfig.Env))
@@ -224,6 +239,9 @@ func (b *Builder) Run(step *Step, exec Executor, noRunsRemaining bool) error {
 		}
 	}
 
+	//log.Printf("Aqui estou: %#v\n", b.Excludes)
+	// FIXME: this is where the copy is done.
+	//log.Printf("Copy Run: %#v\n", copies)
 	if err := exec.Copy(b.Excludes, copies...); err != nil {
 		return err
 	}
@@ -277,6 +295,8 @@ func (b *Builder) Arguments() []string {
 // ErrNoFROM is returned if the Dockerfile did not contain a FROM
 // statement.
 var ErrNoFROM = fmt.Errorf("no FROM statement found")
+
+var ErrMultipleFROM = fmt.Errorf("multiple FROM statements")
 
 // From returns the image this dockerfile depends on, or an error
 // if no FROM is found or if multiple FROM are specified. If a
