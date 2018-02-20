@@ -42,10 +42,10 @@ func main() {
 	}
 
 	options.Directory = args[0]
-	//if len(tags) > 0 {
-	//options.Tag = tags[0]
-	//options.AdditionalTags = tags[1:]
-	//}
+	if len(tags) > 0 {
+		options.Tag = tags[0]
+		options.AdditionalTags = tags[1:]
+	}
 	if len(dockerfilePath) == 0 {
 		dockerfilePath = filepath.Join(options.Directory, "Dockerfile")
 	}
